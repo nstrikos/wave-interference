@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <title>Waves</title>
+    <script type="text/javascript" src="./libs/three.js"></script>
+    <script type="text/javascript" src="./libs/stats.min.js"></script>
+    <script type="text/javascript" src="./libs/dat.gui.min.js"></script>
+    <script type="text/javascript" src="./libs/OrbitControls.js"></script>
+    <style>
+        body{
+            /* set margin to 0 and overflow to hidden, to go fullscreen */
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+
+<div id="Stats-output">
+</div>
+
+<!-- Div which will hold the Output -->
+<div id="WebGL-output">
+</div>
+
+<!-- Javascript code that runs our Three.js examples -->
+<script type="text/javascript">
+
+    var camera, scene, renderer, stats, orbitControls, clock;
+    var axes, plane;
+
+    var frame;
+    var gui, gui2;
+    var particleSystem, particleCount, time = 0, sourceActiveTime = 0, source2ActiveTime = 0;
+
+    var params;
+    var RunSimulation, AutoRotate, ReferencePlane;
+    var FirstSource, SecondSource;
+    var FirstSourceAmplitude, SecondSourceAmplitude;
+    var FirstSourceWavelength, SecondSourceWavelength;
+    var FirstSourceFrequency, SecondSourceFrequency;
+    var Paused, ShowMaxima;
+    var pos2x, pos2z;
+
+    //Run init function when window is loaded
+	window.onload = init;
+
+    function initVariables() {
+
+        console.log("Initializing variables");
+
+        clock = new THREE.Clock();
+        frame = 0;
+
+        RunSimulation = true;
+	ReferencePlane = true;
+        AutoRotate = false;
+        FirstSource = true;
+        SecondSource = false;
+        FirstSourceAmplitude = 2.0;
+        SecondSourceAmplitude = 2.0;
+        FirstSourceWavelength = 20.0;
+        SecondSourceWavelength = 20.0;
+        FirstSourceFrequency = 1.0;
+        SecondSourceFrequency = 1.0;
+        pos2x = pos2z = 50.0;
+        Paused = false;
+        ShowMaxima = false;
+        
+        params = {
+            DisplayFirstSource: true,
+            a1: 2.0,
+            lamda1: 20.0,
+            f1:1.0,
+            DisplaySecondSource: false,
+            a2: 2.0,
+            lamda2: 20.0,
+            f2: 1.0,
+            pos2x: 50.0,
+            pos2z: 50.0,
+            refPlane: true,
+            autoRotate: false,
+            paused: false,
+            maxima: false,
+            screenShot: function() {
+                window.open( renderer.domElement.toDataURL( 'image/png' ), 'screenshot' );
+                },
+            restart: function() {
+                time = 0.0;
+                sourceActiveTime = 0.0;
+                source2ActiveTime = 0.0;
+            }    
+        };
+        gui2 = new dat.GUI({
+            height : 5 * 32 - 1,
+            width: 200
+        });
+        gui = new dat.GUI({
+            height : 5 * 32 - 1,
+            width: 400
+        });
+        gui2.add(params, 'DisplayFirstSource').name('First Source Active ').onFinishChange(function(){
+            FirstSource = params.DisplayFirstSource;
+            sourceActiveTime = time;
+            });
+        gui.add(params, 'a1').min(0.5).max(10.0).name('First Source Amplitude ').onFinishChange(function(){
+            FirstSourceAmplitude = params.a1;
+            });
+        gui.add(params, 'lamda1').min(4.0).max(40.0).name('First Source Wavelength').onFinishChange(function(){
+            FirstSourceWavelength = params.lamda1;
+            });
+        gui.add(params, 'f1').min(0.01).max(5.0).name('First Source Frequency').onFinishChange(function(){
+            FirstSourceFrequency = params.f1;
+            });  
+        gui2.add(params, 'DisplaySecondSource').name('Second Source Active ').onFinishChange(function(){
+            SecondSource = params.DisplaySecondSource;
+            source2ActiveTime = time;
+            });
+        gui.add(params, 'a2').min(0.5).max(10.0).name('Second Source Amplitude ').onFinishChange(function(){
+            SecondSourceAmplitude = params.a2;
+            });
+        gui.add(params, 'lamda2').min(4.0).max(40.0).name('Second Source Wavelength').onFinishChange(function(){
+            SecondSourceWavelength = params.lamda2;
+            });
+        gui.add(params, 'f2').min(0.01).max(5.0).name('Second Source Frequency').onFinishChange(function(){
+            SecondSourceFrequency = params.f2;
+            });
+        gui.add(params, 'pos2x').min(-100.0).max(100.0).name('Second Source Position x').onFinishChange(function(){
+            pos2x = params.pos2x;
+            });
+        gui.add(params, 'pos2z').min(-100.0).max(100.0).name('Second Source Position z').onFinishChange(function(){
+            pos2z = params.pos2z;
+            });
+        gui2.add(params, 'refPlane').name('Reference plane').onFinishChange(function(){
+            ReferencePlane = params.refPlane;
+            });
+        gui2.add(params, 'autoRotate').name('Auto rotate').onFinishChange(function(){
+            AutoRotate = params.autoRotate;
+            orbitControls.autoRotate = AutoRotate;
+            });
+        gui2.add(params, 'paused').name('Pause').onFinishChange(function(){
+            Paused = params.paused;
+        });
+        gui2.add(params, 'maxima').name('Show maxima').onFinishChange(function(){
+            ShowMaxima = params.maxima;
+        });
+        gui2.add(params, 'restart').name('Restart'); 
+        gui2.add(params, 'screenShot').name('Screenshot');       
+    }
+    
+    function addReferencePlane() {
+
+        axes = new THREE.AxisHelper(5000);
+        scene.add(axes);
+
+        // Grid
+
+        var line_material = new THREE.LineBasicMaterial( { color: 0x303030 } ), geometry = new THREE.Geometry(), floor = -75, step = 250;
+
+        // floor - the y(height of the floor)
+        //step how close the grid will be
+        // 40 -> 5000 / 250
+        // this grid goes from -5000 to 5000
+
+        for ( var i = 0; i <= 40; i ++ ) {
+
+            geometry.vertices.push( new THREE.Vector3( - 5000, floor, i * step - 5000 ) );
+            geometry.vertices.push( new THREE.Vector3(   5000, floor, i * step - 5000 ) );
+
+            geometry.vertices.push( new THREE.Vector3( i * step - 5000, floor, -5000 ) );
+            geometry.vertices.push( new THREE.Vector3( i * step - 5000, floor,  5000 ) );
+        }
+
+        plane = new THREE.Line( geometry, line_material, THREE.LinePieces );
+        plane.name = "plane";
+        //scene.add( plane );
+        console.log("Reference plane added");
+    }
+  
+    function addParticles() {
+        //Particle system
+
+        particles = new THREE.Geometry();
+        pMaterial = new THREE.PointsMaterial({
+            vertexColors: THREE.VertexColors,
+            size: 4
+        });
+        var count = 0;
+        for (var x = -200; x < 200; x++) {
+            for (var z = -200; z < 200; z++) {
+                var    particle = new THREE.Vector3( 0.6*x, 0, 0.6*z);
+                particles.vertices.push(particle);
+                count++;
+            }             
+        }
+        
+        particleCount = count;
+        
+        particleSystem = new THREE.Points(particles, pMaterial);
+        for (var i = 0; i < particleCount; i++) {
+            particleSystem.geometry.colors[i] = new THREE.Color(0xffffff);
+        }
+        scene.add(particleSystem);
+    }
+
+    function init() {
+		
+        initVariables();
+        scene = new THREE.Scene();
+	setCamera();
+	setRenderer();
+        addReferencePlane();
+        addParticles();
+	addOrbitControls();
+	setStats();
+        render();
+
+        document.getElementById("WebGL-output").appendChild(renderer.domElement);
+		
+	function setCamera() {
+            camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 10, 50000 );
+            camera.target = new THREE.Vector3(0, 0, 0);
+            camera.position.x = -120 ;
+            camera.position.y = 80 ;
+            camera.position.z = 220 ;
+            camera.lookAt(scene.position);
+	}
+
+	function setRenderer() {
+            renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
+            renderer.setClearColor(new THREE.Color(0x000000, 0.0));
+            renderer.shadowMap.Enabled = true;
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+	}
+
+        function addOrbitControls() {
+            orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+            orbitControls.autoRotate = AutoRotate;
+	}	
+		
+        function setStats() {
+            stats = new Stats();
+            stats.setMode(0); // 0: fps, 1: ms
+
+            // Align top-left
+            stats.domElement.style.position = 'absolute';
+            stats.domElement.style.left = '0px';
+	    stats.domElement.style.top = '0px';
+            document.getElementById("Stats-output").appendChild( stats.domElement );
+        }
+		
+	function render() {
+            stats.update();
+     
+            if (ReferencePlane) {
+                scene.add(plane);
+                scene.add(axes);
+            }
+            else {
+                scene.remove(plane);
+                scene.remove(axes);
+            }    
+            
+            var delta = clock.getDelta();
+            if (!Paused)
+                time += delta;
+        
+            var verts = particleSystem.geometry.vertices;
+            for (var i = 0; i < particleCount; i++) {
+                var vert = verts[i];
+                var distance = Math.sqrt(vert.x * vert.x + vert.z * vert.z);
+               
+                var pos1 = 2 * Math.PI / FirstSourceWavelength * distance;
+                var pos3 = pos1 - 2 * Math.PI * FirstSourceFrequency * time;
+                var first = 0.0;
+                if (FirstSource) {
+                    if ( distance > 20 * FirstSourceFrequency * (time - sourceActiveTime))
+                        first = 0.0;
+                    else
+                        first = FirstSourceAmplitude * Math.sin(pos3);
+                }                
+                
+                var distance2 = Math.sqrt( (vert.x - pos2x) * (vert.x - pos2x) + (vert.z - pos2z) * (vert.z - pos2z));
+                var pos4 = 2 * Math.PI / SecondSourceWavelength * distance2;
+                var pos5 = pos4 - 2 * Math.PI * SecondSourceFrequency * time;
+                
+                var second = 0.0;
+                
+                if (SecondSource) {
+                    if (distance2 > 20 * SecondSourceFrequency * (time - source2ActiveTime) )
+                        second = 0.0;
+                    else
+                        second = SecondSourceAmplitude * Math.sin(pos5);
+                }              
+                
+                var final = first + second;
+                
+                vert.y = final;
+             
+                var red, green, blue;
+                if (distance <= 50) {
+                    red = 1 - distance / 50.0;
+                    blue = 1 - distance / 150.0;
+                    green = 1 - distance / 100.0;
+                }
+                else if (distance > 50 && distance < 100) {
+                    red = 0.0;
+                    green = 1 - distance / 100.0;
+                    blue = 1 - distance / 150.0;
+                }
+                else if (distance >= 100) {
+                    red = 0.0;
+                    green = 0.0;
+                    blue = 1 - distance / 150.0;
+                }
+                
+                if (ShowMaxima) {
+                    if (FirstSource && SecondSource) {
+                        if ( Math.abs(final - (FirstSourceAmplitude + SecondSourceAmplitude )) < 0.2) {
+                            red = 1.0;
+                            green = 1.65 / 2.55;
+                            blue = 0.0;
+                        }
+                    }
+                    else if (FirstSource) {
+                        if ( Math.abs(final - FirstSourceAmplitude) < 0.05) {
+                            red = 1.39 / 2.55;
+                            green = 0.0;
+                            blue = 1.39 / 2.55;
+                        }
+                    }
+                    else if (SecondSource) {
+                        if ( Math.abs(final - SecondSourceAmplitude ) < 0.05) {
+                            red = 1.0;
+                            green = 1.0;
+                            blue = 0.0;
+                        }
+                    }
+                }                               
+                
+                //particleSystem.geometry.colors[i] = new THREE.Color(red, green, blue);
+                particleSystem.geometry.colors[i].setRGB(red, green, blue);
+            }
+            particleSystem.geometry.verticesNeedUpdate = true;
+            particleSystem.geometry.colorsNeedUpdate = true;
+  
+            orbitControls.update(delta);
+
+            requestAnimationFrame(render);
+            renderer.render(scene, camera);
+        }
+    };
+
+    function onResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // listen to the resize events
+    window.addEventListener('resize', onResize, false);
+
+</script>
+</body>
+</html>

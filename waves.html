@@ -55,7 +55,7 @@
         frame = 0;
 
         RunSimulation = true;
-	ReferencePlane = true;
+	      ReferencePlane = true;
         AutoRotate = false;
         FirstSource = true;
         SecondSource = false;
@@ -68,7 +68,7 @@
         pos2x = pos2z = 50.0;
         Paused = false;
         ShowMaxima = false;
-        
+
         params = {
             DisplayFirstSource: true,
             a1: 2.0,
@@ -91,7 +91,7 @@
                 time = 0.0;
                 sourceActiveTime = 0.0;
                 source2ActiveTime = 0.0;
-            }    
+            }
         };
         gui2 = new dat.GUI({
             height : 5 * 32 - 1,
@@ -113,7 +113,7 @@
             });
         gui.add(params, 'f1').min(0.01).max(5.0).name('First Source Frequency').onFinishChange(function(){
             FirstSourceFrequency = params.f1;
-            });  
+            });
         gui2.add(params, 'DisplaySecondSource').name('Second Source Active ').onFinishChange(function(){
             SecondSource = params.DisplaySecondSource;
             source2ActiveTime = time;
@@ -146,10 +146,10 @@
         gui2.add(params, 'maxima').name('Show maxima').onFinishChange(function(){
             ShowMaxima = params.maxima;
         });
-        gui2.add(params, 'restart').name('Restart'); 
-        gui2.add(params, 'screenShot').name('Screenshot');       
+        gui2.add(params, 'restart').name('Restart');
+        gui2.add(params, 'screenShot').name('Screenshot');
     }
-    
+
     function addReferencePlane() {
 
         axes = new THREE.AxisHelper(5000);
@@ -177,8 +177,19 @@
         plane.name = "plane";
         //scene.add( plane );
         console.log("Reference plane added");
+
+
+	var sphereGeometry = new THREE.SphereGeometry(30, 20, 20);
+ 	var texture = THREE.ImageUtils.loadTexture("./images/earth.jpg");
+    	var material = new THREE.MeshBasicMaterial({
+                                                   map: texture,
+                                                   bumpMap: texture,
+                                                   bumpScale: 0.05
+                                               });
+    	var sphere1 = new THREE.Mesh(sphereGeometry, material);
+    	scene.add(sphere1);
     }
-  
+
     function addParticles() {
         //Particle system
 
@@ -193,11 +204,11 @@
                 var    particle = new THREE.Vector3( 0.6*x, 0, 0.6*z);
                 particles.vertices.push(particle);
                 count++;
-            }             
+            }
         }
-        
+
         particleCount = count;
-        
+
         particleSystem = new THREE.Points(particles, pMaterial);
         for (var i = 0; i < particleCount; i++) {
             particleSystem.geometry.colors[i] = new THREE.Color(0xffffff);
@@ -206,19 +217,19 @@
     }
 
     function init() {
-		
+
         initVariables();
         scene = new THREE.Scene();
-	setCamera();
-	setRenderer();
+	      setCamera();
+	      setRenderer();
         addReferencePlane();
         addParticles();
-	addOrbitControls();
-	setStats();
+	      addOrbitControls();
+	      setStats();
         render();
 
         document.getElementById("WebGL-output").appendChild(renderer.domElement);
-		
+
 	function setCamera() {
             camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 10, 50000 );
             camera.target = new THREE.Vector3(0, 0, 0);
@@ -239,8 +250,8 @@
         function addOrbitControls() {
             orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
             orbitControls.autoRotate = AutoRotate;
-	}	
-		
+	}
+
         function setStats() {
             stats = new Stats();
             stats.setMode(0); // 0: fps, 1: ms
@@ -251,10 +262,10 @@
 	    stats.domElement.style.top = '0px';
             document.getElementById("Stats-output").appendChild( stats.domElement );
         }
-		
+
 	function render() {
             stats.update();
-     
+
             if (ReferencePlane) {
                 scene.add(plane);
                 scene.add(axes);
@@ -262,17 +273,17 @@
             else {
                 scene.remove(plane);
                 scene.remove(axes);
-            }    
-            
+            }
+
             var delta = clock.getDelta();
             if (!Paused)
                 time += delta;
-        
+
             var verts = particleSystem.geometry.vertices;
             for (var i = 0; i < particleCount; i++) {
                 var vert = verts[i];
                 var distance = Math.sqrt(vert.x * vert.x + vert.z * vert.z);
-               
+
                 var pos1 = 2 * Math.PI / FirstSourceWavelength * distance;
                 var pos3 = pos1 - 2 * Math.PI * FirstSourceFrequency * time;
                 var first = 0.0;
@@ -281,25 +292,25 @@
                         first = 0.0;
                     else
                         first = FirstSourceAmplitude * Math.sin(pos3);
-                }                
-                
+                }
+
                 var distance2 = Math.sqrt( (vert.x - pos2x) * (vert.x - pos2x) + (vert.z - pos2z) * (vert.z - pos2z));
                 var pos4 = 2 * Math.PI / SecondSourceWavelength * distance2;
                 var pos5 = pos4 - 2 * Math.PI * SecondSourceFrequency * time;
-                
+
                 var second = 0.0;
-                
+
                 if (SecondSource) {
                     if (distance2 > 20 * SecondSourceFrequency * (time - source2ActiveTime) )
                         second = 0.0;
                     else
                         second = SecondSourceAmplitude * Math.sin(pos5);
-                }              
-                
+                }
+
                 var final = first + second;
-                
+
                 vert.y = final;
-             
+
                 var red, green, blue;
                 if (distance <= 50) {
                     red = 1 - distance / 50.0;
@@ -316,7 +327,7 @@
                     green = 0.0;
                     blue = 1 - distance / 150.0;
                 }
-                
+
                 if (ShowMaxima) {
                     if (FirstSource && SecondSource) {
                         if ( Math.abs(final - (FirstSourceAmplitude + SecondSourceAmplitude )) < 0.2) {
@@ -339,14 +350,14 @@
                             blue = 0.0;
                         }
                     }
-                }                               
-                
+                }
+
                 //particleSystem.geometry.colors[i] = new THREE.Color(red, green, blue);
                 particleSystem.geometry.colors[i].setRGB(red, green, blue);
             }
             particleSystem.geometry.verticesNeedUpdate = true;
             particleSystem.geometry.colorsNeedUpdate = true;
-  
+
             orbitControls.update(delta);
 
             requestAnimationFrame(render);

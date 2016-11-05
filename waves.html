@@ -55,7 +55,7 @@
         frame = 0;
 
         RunSimulation = true;
-	      ReferencePlane = true;
+	ReferencePlane = true;
         AutoRotate = false;
         FirstSource = true;
         SecondSource = false;
@@ -177,17 +177,6 @@
         plane.name = "plane";
         //scene.add( plane );
         console.log("Reference plane added");
-
-
-	var sphereGeometry = new THREE.SphereGeometry(30, 20, 20);
- 	var texture = THREE.ImageUtils.loadTexture("./images/earth.jpg");
-    	var material = new THREE.MeshBasicMaterial({
-                                                   map: texture,
-                                                   bumpMap: texture,
-                                                   bumpScale: 0.05
-                                               });
-    	var sphere1 = new THREE.Mesh(sphereGeometry, material);
-    	scene.add(sphere1);
     }
 
     function addParticles() {
